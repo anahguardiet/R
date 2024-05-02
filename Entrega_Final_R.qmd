@@ -1,0 +1,169 @@
+---
+title: "practica_final"
+format: html
+editor: visual
+---
+
+Vamos a utilizar el dataset de semillas que se encuentra aquí: https://archive.ics.uci.edu/ml/datasets/seeds#
+
+Primero vamos a descargarnos el dataset con el siguiente comando:
+
+```{r}
+library(tidyverse)
+df_seeds <- read.table('https://archive.ics.uci.edu/ml/machine-learning-databases/00236/seeds_dataset.txt', col.names =c('area','perimetro','compacto','longitud','anchura','coeficient.asimetria','longitud.ranura','tipo'))
+```
+
+```{r}
+df_seeds
+```
+
+#### PREGUNTA 1 (0.5pt)
+
+¿Cuantas filas y cuantas columnas tiene el dataframe df_seeds?
+
+**Respuesta**:
+
+```{r}
+dim(df_seeds)
+
+```
+
+```{r}
+paste("filas:", nrow(df_seeds), ", columnas:", ncol(df_seeds))
+
+```
+
+#### PREGUNTA 2 (0.5pt)
+
+Vamos a convertir en factor la columna tipo. Vamos a reemplazar los números por su correspondiente etiqueta (label). La correspondencia entre el código y el tipo es:
+
+-   1 - Kama
+-   2 - Rosa
+-   3 - Canadian
+
+Convierte en factor la columna tipo, respetando las etiquetas:
+
+**Respuesta**:
+
+```{r}
+df_seeds$tipo <- factor(df_seeds$tipo, levels = c(1, 2, 3), labels = c("Kama", "Rosa", "Canadian"))
+df_seeds$tipo
+```
+
+#### PREGUNTA 3 (1pt)
+
+¿Cual es la media del area de cada uno de los tipos?
+
+**Respuesta**
+
+```{r}
+aggregate(area ~ tipo, data = df_seeds, FUN = mean)
+
+```
+
+#### PREGUNTA 4 (0.5pt)
+
+¿Como se llama el siguiente tipo de gráfico?. ¿Qué representa la línea del centro de la caja?
+
+```{r}
+ggplot(df_seeds, aes(x=tipo, y=area)) + geom_boxplot()
+```
+
+**Respuesta**: Esta visualización es un boxplot y la línea dentro de la caja representa la mediana (del área de cada 'tipo').
+
+#### PREGUNTA 5 (1.5pt)
+
+¿Como pintarías un diagrama de puntos (o scatterplot) con ggplot con las siguientes características? - En el eje X la variable compacto - En el eje Y la variable area - Cada tipo de semilla debería tener un color diferente
+
+**Respuesta**:
+
+```{r}
+ggplot(df_seeds, aes(x=compacto, y=area, color=tipo)) + 
+    geom_point() +
+    labs(title="Scatter plot of Area vs Compactness", x="Compactness", y="Area")
+
+```
+
+#### PREGUNTA 6 (0.5pt)
+
+¿Qué hace la siguiente línea?:
+
+```{r}
+df_seeds |> mutate(is_kama = tipo=='Kama') -> df_seeds
+```
+
+**Respuesta**: La función 'mutate' se utiliza para añadir nuevas columnas o modificar las existentes dentro de un dataframe. En este caso, se añade la columna is_kama, evaluando si el valor en la columna 'tipo' es igual a 'Kama'. Si es 'Kama', entonces is_kama será TRUE, y si no es 'Kama', será FALSE.
+
+#### PREGUNTA 7 (1.5pt)
+
+Vamos a dividir el conjunto de datos en test y training porque vamos a entrenar un modelo que me permita diferenciar si una semilla es de tipo Kama o no. ¿Por qué es aconsejable dividir el dataset en los grupos de train y test?
+
+```{r}
+set.seed(123) # Este set.seed hace que a todos nos generen los mismos número aleatorios
+idx <- sample(1:nrow(df_seeds), 0.7*nrow(df_seeds))
+df_seeds_train <- df_seeds[idx,]
+df_seeds_test <- df_seeds[-idx,]
+```
+
+**Respuesta**: Es aconsejable dividir el conjunto de datos en conjuntos de training y de testing para evitar el overfitting. Esto permite entrenar al modelo con una serie de datos, y luego probar el modelo con nuevos datos que no ha visto, lo que proporciona una evaluación imparcial de su rendimiento.
+
+#### PREGUNTA 8 (1pt)
+
+Vamos a crear un modelo para realizar una clasificación binaria, donde le pasaremos como entrada las columnas: area, perimetro, compacto, longitud, coeficient.asimetria y longitud.ranura
+
+¿Qué tipo de algoritmo o modelo debería usar?
+
+**Respuesta**: Regresión logística es una técnica de clasificación que estima probabilidades utilizando una función logística, lo que la convierte en una buena opción inicial para problemas de clasificación binaria. Ideal cuando se necesita un marco probabilístico, fácil de interpretar y cuando la relación entre las variables independiente y dependiente es aproximadamente lineal (comprobado en el scatterplot del ejercicio 5).
+
+#### PREGUNTA 9 (1pt)
+
+Crea un modelo que me permita clasificar si una semilla es de tipo Kama o no con las siguientes columnas: area, perimetro, compacto, longitud, coeficient.asimetria, longitud.ranura
+
+**Respuesta**:
+
+```{r}
+model <- glm(is_kama ~ area + perimetro + compacto + longitud + coeficient.asimetria + longitud.ranura, data = df_seeds_train,family = binomial(link = "logit"))
+
+summary(model)
+```
+
+#### PREGUNTA 10 (1pt)
+
+Si usamos un umbral de 0 en la salida del modelo (lo que equivale a probabilidad de 0.5 cuando usamos el predict con type='response') ¿Cuales son los valores de precisión y exhausitividad?
+
+**Respuesta**.
+
+```{r}
+predicciones <- predict(model, newdata = df_seeds_test, type = "response")
+predicciones_clasificadas <- ifelse(predicciones > 0.5, TRUE, FALSE)
+precision <- sum(predicciones_clasificadas == df_seeds_test$is_kama) / length(predicciones_clasificadas)
+exhaustividad <- sum(predicciones_clasificadas == TRUE & df_seeds_test$is_kama == TRUE) / sum(df_seeds_test$is_kama == TRUE)
+precision
+exhaustividad
+```
+
+#### PREGUNTA 11 (1.5pt)
+
+¿Qué están haciendo las siguientes líneas?
+
+```{r}
+set.seed(123)
+cl<-df_seeds |> select(area,perimetro,compacto,longitud,anchura,coeficient.asimetria,longitud.ranura) |> kmeans(3)
+table(real=df_seeds$tipo,cluster=cl$cluster)
+```
+
+**Respuesta**:
+
+**set.seed(123):** Establece una semilla para la generación de números aleatorios
+
+**cl \<- df_seeds \|\> select(area, perimetro, compacto, longitud, anchura, coeficient.asimetria, longitud.ranura) \|\> kmeans(3):** Realiza el algoritmo de k-means para agrupar los datos en 3 clusters
+
+**table(real=df_seeds**$tipo, cluster=cl$**cluster):** Crea una tabla de contingencia entre los tipos reales y los clusters asignados por kmeans.
+
+Se ve como:
+
+-   cluster 1 lo componen 60 Rosa y 1 Kama
+
+-   cluster 2 lo componen 60 Kama, 10 Rosa y 2 Canadian
+
+-   cluster 3 lo componen 68 Canadian y 9 Kama
